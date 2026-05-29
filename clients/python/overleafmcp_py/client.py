@@ -116,6 +116,17 @@ class OverleafMCPClient:
             },
         )
 
+    async def clone_project(
+        self,
+        project_id: str,
+        project_name: str,
+        tags: list[dict[str, Any]] | None = None,
+    ) -> Any:
+        return await self.call_tool(
+            OverleafToolName.CLONE_PROJECT,
+            {"projectId": project_id, "projectName": project_name, "tags": tags},
+        )
+
     async def create_tag(self, name: str, color: str | None = None) -> Any:
         return await self.call_tool(
             OverleafToolName.CREATE_TAG,

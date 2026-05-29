@@ -10,6 +10,7 @@ import { clearStoredAuth } from "./auth-store.js";
 import { loginWithBrowser } from "./browser-auth.js";
 import type {
   AssignProjectTagsInput,
+  CloneProjectInput,
   CompileProjectInput,
   CreateFileInput,
   CreateProjectInput,
@@ -370,6 +371,39 @@ export class OverleafClient {
     }
 
     return { projectId: payload.project_id };
+  }
+
+  async cloneProject(input: CloneProjectInput): Promise<{ projectId: string; name: string }> {
+    assertAuthForMode(this.config, "session");
+    const csrfToken = await this.getDashboardCsrfToken();
+    const tagIds = input.tags && input.tags.length > 0 ? await this.resolveTagIds(input.tags) : [];
+    const response = await fetch(`${this.baseUrl}/Project/${input.projectId}/clone`, {
+      method: "POST",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        projectName: input.projectName,
+        tags: tagIds.map((id) => ({ id }))
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`cloneProject failed with HTTP ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { project_id?: string; name?: string };
+    if (!payload.project_id) {
+      throw new Error("cloneProject did not return a project_id.");
+    }
+
+    return {
+      projectId: payload.project_id,
+      name: payload.name ?? input.projectName
+    };
   }
 
   async listFiles(input: ListFilesInput): Promise<{ files: string[] }> {

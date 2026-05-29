@@ -116,6 +116,13 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    toolSchemas.cloneProject.name,
+    toolSchemas.cloneProject.description,
+    toolSchemas.cloneProject.inputSchema.shape,
+    async (input) => formatResult(await client.cloneProject(toolSchemas.cloneProject.inputSchema.parse(input)))
+  );
+
+  server.tool(
     toolSchemas.createFile.name,
     toolSchemas.createFile.description,
     toolSchemas.createFile.inputSchema.shape,

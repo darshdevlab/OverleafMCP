@@ -198,9 +198,10 @@ Use this exact sequence in a fresh chat after the MCP host has loaded the server
 If you want a stronger end-to-end test:
 
 1. `Create a new Overleaf project named "MCP Connection Test"`
-2. `Create file test.tex in that project with content \\section{Hello}`
-3. `Compile that project`
-4. `Delete that project with overleaf_delete_project`
+2. `Clone an existing project with overleaf_clone_project`
+3. `Create file test.tex in that project with content \\section{Hello}`
+4. `Compile that project`
+5. `Delete that project with overleaf_delete_project`
 
 If you want a tag-specific test:
 

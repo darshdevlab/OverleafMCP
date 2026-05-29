@@ -93,6 +93,16 @@
       }
     },
     {
+      "name": "overleaf_clone_project",
+      "description": "Copy an existing Overleaf project into a new project, optionally assigning tags to the copy.",
+      "auth": "session",
+      "arguments": {
+        "projectId": "string",
+        "projectName": "string",
+        "tags": "array<{id?: string, name?: string, color?: string}>?"
+      }
+    },
+    {
       "name": "overleaf_list_files",
       "description": "List files in an Overleaf project via the Git-backed workflow.",
       "auth": "git",

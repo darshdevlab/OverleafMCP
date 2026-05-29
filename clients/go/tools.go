@@ -14,6 +14,7 @@ const (
 	ToolListFiles            = "overleaf_list_files"
 	ToolReadFile             = "overleaf_read_file"
 	ToolCreateProject        = "overleaf_create_project"
+	ToolCloneProject         = "overleaf_clone_project"
 	ToolCreateFile           = "overleaf_create_file"
 	ToolUpdateFile           = "overleaf_update_file"
 	ToolDeleteFile           = "overleaf_delete_file"

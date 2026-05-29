@@ -34,6 +34,7 @@ This repo is organized as a public monorepo:
 ## Planned Capabilities
 
 - Create projects from blank or template flows
+- Duplicate existing projects into named copies
 - Create and assign organization tags
 - Create, update, and delete project files
 - Upload files or full project archives
@@ -54,6 +55,7 @@ This repository currently provides:
 - live project listing via session auth
 - live tag listing, creation, edit, deletion, and project assignment via session auth
 - live blank/template project creation via session auth
+- live project duplication via Overleaf's native clone route
 - live archive-to-project import via Overleaf's native project upload route in session-only mode
 - live project deletion via session auth
 - live session-first file create, read, update, delete, and upload operations
@@ -209,6 +211,7 @@ Useful first checks after setup:
 
 - `Run overleaf_auth_status`
 - `Run overleaf_list_tags`
+- `Clone project <projectId> into "your-v2-name"` with `overleaf_clone_project`
 - `Create an Overleaf tag named "mcp-test-tag"`
 - `Create a new Overleaf project named "MCP Connection Test" with tags [{"name":"mcp-test-tag"}]`
 - `Delete project <projectId>` with `overleaf_delete_project`

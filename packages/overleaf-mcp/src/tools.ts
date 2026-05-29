@@ -107,6 +107,23 @@ export const toolSchemas = {
         .optional()
     })
   },
+  cloneProject: {
+    name: "overleaf_clone_project",
+    description: "Copy an existing Overleaf project into a new project, optionally assigning tags to the copy.",
+    inputSchema: z.object({
+      projectId: z.string().min(1),
+      projectName: z.string().min(1),
+      tags: z
+        .array(
+          z.object({
+            id: z.string().min(1).optional(),
+            name: z.string().min(1).optional(),
+            color: z.string().min(1).optional()
+          })
+        )
+        .optional()
+    })
+  },
   createFile: {
     name: "overleaf_create_file",
     description: "Create a file in an Overleaf project using session-first transport and Git when configured.",

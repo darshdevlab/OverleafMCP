@@ -33,6 +33,12 @@ export interface CreateProjectInput {
   tags?: ProjectTagInput[];
 }
 
+export interface CloneProjectInput {
+  projectId: string;
+  projectName: string;
+  tags?: ProjectTagReferenceInput[];
+}
+
 export interface ListFilesInput {
   projectId: string;
   extension?: string;

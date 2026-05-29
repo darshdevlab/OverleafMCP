@@ -108,6 +108,17 @@ func (c *Client) CreateProject(ctx context.Context, name string, templateID stri
 	return c.CallToolText(ctx, ToolCreateProject, payload)
 }
 
+func (c *Client) CloneProject(ctx context.Context, projectID string, projectName string, tags []map[string]any) (string, error) {
+	payload := map[string]any{
+		"projectId":   projectID,
+		"projectName": projectName,
+	}
+	if len(tags) > 0 {
+		payload["tags"] = tags
+	}
+	return c.CallToolText(ctx, ToolCloneProject, payload)
+}
+
 func (c *Client) CreateTag(ctx context.Context, name string, color string) (string, error) {
 	payload := map[string]any{
 		"name": name,
