@@ -26,6 +26,13 @@ There are two auth modes:
   - optional `OVERLEAF_GIT_TOKEN`
   - used only for Git-backed sync and bulk repo workflows
 
+There is also one execution-mode switch:
+
+- `OVERLEAF_DISABLE_BROWSER_FALLBACK=true`
+  - forbids Playwright-driven file editing from the MCP server
+  - recommended for strict CLI environments
+  - in that mode, session-only `update_file` will fail unless you use Git-backed writes
+
 No GitHub token is required.
 
 ## Before Any Host Setup

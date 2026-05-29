@@ -468,6 +468,11 @@ export class OverleafClient {
     }
 
     assertAuthForMode(this.config, "session");
+    if (this.config.disableBrowserFallback) {
+      throw new Error(
+        "Session-only update_file browser fallback is disabled. Configure OVERLEAF_GIT_TOKEN for CLI-safe writes or unset OVERLEAF_DISABLE_BROWSER_FALLBACK."
+      );
+    }
     await this.browserUpdateTextFile(input.projectId, input.path, input.content);
     return { path: input.path, committed: true };
   }

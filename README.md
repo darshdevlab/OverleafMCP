@@ -102,6 +102,7 @@ Supported auth inputs:
 - `OVERLEAF_SESSION`: session cookie for dashboard and editor actions
 - `OVERLEAF_GIT_TOKEN`: optional Git credential for clone, pull, push, and sync
 - `OVERLEAF_EMAIL`: optional username for Git flows where required
+- `OVERLEAF_DISABLE_BROWSER_FALLBACK`: optional, set to `true` to forbid Playwright-based session write fallback
 
 Auth modes:
 
@@ -139,6 +140,12 @@ Optional Git sync auth:
 ```bash
 export OVERLEAF_GIT_TOKEN="your_overleaf_git_token"
 export OVERLEAF_EMAIL="you@example.com"
+```
+
+Strict CLI mode:
+
+```bash
+export OVERLEAF_DISABLE_BROWSER_FALLBACK="true"
 ```
 
 Use only the variables required by the operation you want to perform.

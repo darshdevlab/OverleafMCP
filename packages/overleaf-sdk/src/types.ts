@@ -12,6 +12,7 @@ export interface OverleafConfig {
   workspaceRoot: string;
   gitAuthorName: string;
   gitAuthorEmail: string;
+  disableBrowserFallback: boolean;
   authMode: OverleafAuthMode;
   credentials: OverleafCredentials;
 }
