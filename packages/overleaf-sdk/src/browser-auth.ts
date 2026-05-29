@@ -3,7 +3,7 @@ import os from "node:os";
 import { chromium } from "playwright";
 import { writeStoredAuth } from "./auth-store.js";
 
-function browserProfileDir(): string {
+export function browserProfileDir(): string {
   return path.join(os.homedir(), ".overleafmcp", "browser-profile");
 }
 

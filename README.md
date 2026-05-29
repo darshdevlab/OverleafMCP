@@ -58,6 +58,7 @@ This repository currently provides:
 - live project duplication via Overleaf's native clone route
 - live archive-to-project import via Overleaf's native project upload route in session-only mode
 - live project deletion via session auth
+- live session-only text-file updates through the authenticated browser profile when direct socket writes fail
 - live session-first file create, read, update, delete, and upload operations
 - live Git-backed file and repository sync when an Overleaf Git token is configured
 - live compile and PDF download via session auth

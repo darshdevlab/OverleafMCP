@@ -4,10 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { chromium } from "playwright";
+import type { Page } from "playwright";
 import WebSocket, { RawData } from "ws";
 import { assertAuthForMode } from "./auth.js";
 import { clearStoredAuth } from "./auth-store.js";
-import { loginWithBrowser } from "./browser-auth.js";
+import { browserProfileDir, loginWithBrowser } from "./browser-auth.js";
 import type {
   AssignProjectTagsInput,
   CloneProjectInput,
@@ -466,7 +468,7 @@ export class OverleafClient {
     }
 
     assertAuthForMode(this.config, "session");
-    await this.sessionCreateOrUpdateFile(input.projectId, input.path, input.content, true);
+    await this.browserUpdateTextFile(input.projectId, input.path, input.content);
     return { path: input.path, committed: true };
   }
 
@@ -1238,5 +1240,47 @@ export class OverleafClient {
     }
 
     return { projectId: payload.project_id, projectName };
+  }
+
+  private async browserUpdateTextFile(projectId: string, filePath: string, content: string): Promise<void> {
+    const context = await chromium.launchPersistentContext(browserProfileDir(), {
+      headless: true
+    });
+
+    try {
+      const page = await context.newPage();
+      await page.goto(`${this.baseUrl}/project/${projectId}`, {
+        waitUntil: "domcontentloaded",
+        timeout: 120000
+      });
+      await page.waitForTimeout(8000);
+      await this.openProjectFileInBrowser(page, filePath);
+      await page.waitForTimeout(1500);
+      await page.click(".cm-content");
+      await page.keyboard.press("Meta+A");
+      await page.keyboard.insertText(content);
+      await page.waitForTimeout(8000);
+    } finally {
+      await context.close();
+    }
+  }
+
+  private async openProjectFileInBrowser(page: Page, filePath: string): Promise<void> {
+    const normalizedPath = filePath.replace(/^\/+/, "");
+    const segments = normalizedPath.split("/").filter(Boolean);
+    if (segments.length === 0) {
+      throw new Error(`Invalid file path: ${filePath}`);
+    }
+
+    for (const folderName of segments.slice(0, -1)) {
+      const folderButton = page.locator("button").filter({ hasText: folderName }).first();
+      const textContent = await folderButton.textContent();
+      if (textContent?.includes("chevron_right")) {
+        await folderButton.click();
+        await page.waitForTimeout(500);
+      }
+    }
+
+    await page.getByText(segments.at(-1) ?? normalizedPath, { exact: true }).first().click();
   }
 }
