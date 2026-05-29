@@ -7,7 +7,7 @@ Public, security-first Model Context Protocol tooling for Overleaf.
 `OverleafMCP` is a hybrid architecture:
 
 - browser and session-driven actions for account and project UI workflows
-- Git-backed sync for reliable file create, edit, delete, and bulk updates
+- session-first file operations, with Git used when available for more reliable bulk sync
 - a reusable TypeScript SDK that can later power an HTTP API, CLI, or desktop integrations
 
 ## Language Support
@@ -50,11 +50,13 @@ This repository currently provides:
 - a reusable TypeScript SDK surface
 - Python and Go thin clients that talk to the MCP server over stdio
 - a shared contract file for the tool surface
+- browser-driven login that captures and stores the Overleaf session locally
 - live project listing via session auth
 - live blank/template project creation via session auth
-- live Git-backed file create, read, update, delete, upload, and sync operations
+- live session-first file create, read, update, delete, and upload operations
+- live Git-backed file and repository sync when an Overleaf Git token is configured
 - live compile and PDF download via session auth
-- live archive-to-project import through blank project creation plus Git sync
+- live archive-to-project import through blank project creation plus session upload or Git sync
 
 Still pending:
 
@@ -66,11 +68,11 @@ Still pending:
 This project should not become a credential exfiltration vector. The baseline rules are:
 
 - users bring their own Overleaf credentials
-- credentials are read from environment variables or supplied by the MCP host
-- credentials are never persisted by default
+- credentials are read from environment variables, supplied by the MCP host, or captured through the browser login flow
+- only the Overleaf session cookie is stored locally when the browser login flow is used
 - raw session cookies are treated as high-sensitivity secrets
 - Git tokens are preferred for repository-style file workflows when available
-- browser automation should reuse an explicit user-approved session, not scrape login credentials
+- browser login requires an explicit user-approved interactive login
 - logs must redact cookies, bearer tokens, Git credentials, and file upload URLs
 
 ## Full Product Scope
@@ -87,26 +89,20 @@ The public API is intended to support these tool families:
 
 This is the full target scope for `OverleafMCP`, not a reduced subset.
 
-## Implementation Status
-
-The current repository state is still an implementation foundation:
-
-- the package layout is in place
-- the MCP tool surface is defined
-- the auth model is defined
-- the multi-language client shape is in place
-- the live Overleaf transport layer is still pending
-
 ## Authentication
 
-Planned auth inputs:
+Supported auth inputs:
 
 - `OVERLEAF_BASE_URL`: optional, defaults to `https://www.overleaf.com`
 - `OVERLEAF_SESSION`: session cookie for dashboard and editor actions
-- `OVERLEAF_GIT_TOKEN`: Git credential for clone, pull, push, and sync
+- `OVERLEAF_GIT_TOKEN`: optional Git credential for clone, pull, push, and sync
 - `OVERLEAF_EMAIL`: optional username for Git flows where required
 
-Future versions should add secure host integrations such as system keychain support and host-mediated auth prompts. Public releases should not store secrets on disk by default.
+Auth modes:
+
+- `browser login`: opens a Chromium window, lets the user log in, then stores the `overleaf_session2` cookie locally
+- `session env`: use `OVERLEAF_SESSION` directly
+- `hybrid session + git`: adds `OVERLEAF_GIT_TOKEN` for Git-backed sync and bulk file workflows
 
 ## Quick Start
 
@@ -116,16 +112,31 @@ Future versions should add secure host integrations such as system keychain supp
 npm install
 ```
 
-### 2. Set authentication
+### 2. Choose authentication
+
+Browser login:
+
+```bash
+npx @overleafmcp/server
+```
+
+Then call the MCP tool `overleaf_auth_login`.
+
+Environment-based session auth:
 
 ```bash
 export OVERLEAF_BASE_URL="https://www.overleaf.com"
 export OVERLEAF_SESSION="your_overleaf_session_cookie"
+```
+
+Optional Git sync auth:
+
+```bash
 export OVERLEAF_GIT_TOKEN="your_overleaf_git_token"
 export OVERLEAF_EMAIL="you@example.com"
 ```
 
-Use only the variables required by the operation you want to perform. Session-based actions and Git-based actions are intentionally separated.
+Use only the variables required by the operation you want to perform.
 
 ### 3. Build the packages
 
@@ -150,14 +161,14 @@ Example `stdio` configuration:
       "command": "npx",
       "args": ["-y", "@overleafmcp/server"],
       "env": {
-        "OVERLEAF_SESSION": "your_overleaf_session_cookie",
-        "OVERLEAF_GIT_TOKEN": "your_overleaf_git_token",
-        "OVERLEAF_EMAIL": "you@example.com"
+        "OVERLEAF_SESSION": "your_overleaf_session_cookie"
       }
     }
   }
 }
 ```
+
+Add `OVERLEAF_GIT_TOKEN` and `OVERLEAF_EMAIL` only if you want Git-backed sync behavior.
 
 ## Development
 

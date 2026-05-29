@@ -82,6 +82,15 @@ class OverleafMCPClient:
     async def list_projects(self) -> Any:
         return await self.call_tool(OverleafToolName.LIST_PROJECTS)
 
+    async def auth_status(self) -> Any:
+        return await self.call_tool(OverleafToolName.AUTH_STATUS)
+
+    async def auth_login(self) -> Any:
+        return await self.call_tool(OverleafToolName.AUTH_LOGIN)
+
+    async def auth_logout(self) -> Any:
+        return await self.call_tool(OverleafToolName.AUTH_LOGOUT)
+
     async def list_files(self, project_id: str, extension: str | None = None) -> Any:
         return await self.call_tool(
             OverleafToolName.LIST_FILES,

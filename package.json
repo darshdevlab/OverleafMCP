@@ -17,6 +17,7 @@
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",
     "@types/node": "^22.15.31",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.8.3"
   }
 }

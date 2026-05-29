@@ -23,6 +23,27 @@ export function createServer(): McpServer {
   });
 
   server.tool(
+    toolSchemas.authStatus.name,
+    toolSchemas.authStatus.description,
+    toolSchemas.authStatus.inputSchema.shape,
+    async () => formatResult(await client.authStatus())
+  );
+
+  server.tool(
+    toolSchemas.authLogin.name,
+    toolSchemas.authLogin.description,
+    toolSchemas.authLogin.inputSchema.shape,
+    async () => formatResult(await client.authLogin())
+  );
+
+  server.tool(
+    toolSchemas.authLogout.name,
+    toolSchemas.authLogout.description,
+    toolSchemas.authLogout.inputSchema.shape,
+    async () => formatResult(await client.authLogout())
+  );
+
+  server.tool(
     toolSchemas.listProjects.name,
     toolSchemas.listProjects.description,
     toolSchemas.listProjects.inputSchema.shape,

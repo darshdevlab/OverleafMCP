@@ -7,6 +7,24 @@
   },
   "tools": [
     {
+      "name": "overleaf_auth_status",
+      "description": "Report whether Overleaf session auth and Git auth are currently configured.",
+      "auth": "none",
+      "arguments": {}
+    },
+    {
+      "name": "overleaf_auth_login",
+      "description": "Open a browser window, let the user log into Overleaf, and capture the session cookie locally.",
+      "auth": "none",
+      "arguments": {}
+    },
+    {
+      "name": "overleaf_auth_logout",
+      "description": "Clear the locally stored Overleaf session.",
+      "auth": "none",
+      "arguments": {}
+    },
+    {
       "name": "overleaf_list_projects",
       "description": "List Overleaf projects visible to the authenticated user.",
       "auth": "session",
@@ -42,8 +60,8 @@
     },
     {
       "name": "overleaf_create_file",
-      "description": "Create a file in an Overleaf project using the Git-backed workflow.",
-      "auth": "git",
+      "description": "Create a file in an Overleaf project using session-first transport and Git when configured.",
+      "auth": "session_or_git",
       "arguments": {
         "projectId": "string",
         "path": "string",
@@ -52,8 +70,8 @@
     },
     {
       "name": "overleaf_update_file",
-      "description": "Update a file in an Overleaf project using the Git-backed workflow.",
-      "auth": "git",
+      "description": "Update a file in an Overleaf project using session-first transport and Git when configured.",
+      "auth": "session_or_git",
       "arguments": {
         "projectId": "string",
         "path": "string",
@@ -62,8 +80,8 @@
     },
     {
       "name": "overleaf_delete_file",
-      "description": "Delete a file from an Overleaf project using the Git-backed workflow.",
-      "auth": "git",
+      "description": "Delete a file from an Overleaf project using session-first transport and Git when configured.",
+      "auth": "session_or_git",
       "arguments": {
         "projectId": "string",
         "path": "string"
@@ -71,8 +89,8 @@
     },
     {
       "name": "overleaf_upload_files",
-      "description": "Upload one or more files into an existing Overleaf project.",
-      "auth": "session",
+      "description": "Upload one or more files into an existing Overleaf project using session-first transport and Git when configured.",
+      "auth": "session_or_git",
       "arguments": {
         "projectId": "string",
         "paths": "string[]"

@@ -1,6 +1,21 @@
 import { z } from "zod";
 
 export const toolSchemas = {
+  authStatus: {
+    name: "overleaf_auth_status",
+    description: "Report whether Overleaf session auth and Git auth are currently configured.",
+    inputSchema: z.object({})
+  },
+  authLogin: {
+    name: "overleaf_auth_login",
+    description: "Open a browser window, let the user log into Overleaf, and capture the session cookie locally.",
+    inputSchema: z.object({})
+  },
+  authLogout: {
+    name: "overleaf_auth_logout",
+    description: "Clear the locally stored Overleaf session.",
+    inputSchema: z.object({})
+  },
   listProjects: {
     name: "overleaf_list_projects",
     description: "List Overleaf projects visible to the authenticated user.",
@@ -40,7 +55,7 @@ export const toolSchemas = {
   },
   createFile: {
     name: "overleaf_create_file",
-    description: "Create a file in an Overleaf project using the Git-backed workflow.",
+    description: "Create a file in an Overleaf project using session-first transport and Git when configured.",
     inputSchema: z.object({
       projectId: z.string().min(1),
       path: z.string().min(1),
@@ -49,7 +64,7 @@ export const toolSchemas = {
   },
   updateFile: {
     name: "overleaf_update_file",
-    description: "Update a file in an Overleaf project using the Git-backed workflow.",
+    description: "Update a file in an Overleaf project using session-first transport and Git when configured.",
     inputSchema: z.object({
       projectId: z.string().min(1),
       path: z.string().min(1),
@@ -58,7 +73,7 @@ export const toolSchemas = {
   },
   deleteFile: {
     name: "overleaf_delete_file",
-    description: "Delete a file from an Overleaf project using the Git-backed workflow.",
+    description: "Delete a file from an Overleaf project using session-first transport and Git when configured.",
     inputSchema: z.object({
       projectId: z.string().min(1),
       path: z.string().min(1)
@@ -66,7 +81,7 @@ export const toolSchemas = {
   },
   uploadFiles: {
     name: "overleaf_upload_files",
-    description: "Upload one or more files into an existing Overleaf project.",
+    description: "Upload one or more files into an existing Overleaf project using session-first transport and Git when configured.",
     inputSchema: z.object({
       projectId: z.string().min(1),
       paths: z.array(z.string().min(1)).min(1)

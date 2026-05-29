@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import WebSocket, { RawData } from "ws";
 import { assertAuthForMode } from "./auth.js";
+import { clearStoredAuth } from "./auth-store.js";
+import { loginWithBrowser } from "./browser-auth.js";
 import type {
   CompileProjectInput,
   CreateFileInput,
@@ -22,6 +25,29 @@ import type {
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
+
+type ProjectEntityType = "folder" | "file" | "doc";
+
+interface ProjectTreeFolder {
+  _id: string;
+  name: string;
+  folders: ProjectTreeFolder[];
+  fileRefs: ProjectTreeFile[];
+  docs: ProjectTreeFile[];
+}
+
+interface ProjectTreeFile {
+  _id: string;
+  name: string;
+}
+
+interface ProjectEntity {
+  id: string;
+  name: string;
+  type: ProjectEntityType;
+  path: string;
+  parentFolderId: string | null;
+}
 
 interface DashboardProjectBlob {
   projects?: Array<{
@@ -57,6 +83,10 @@ function extractMetaContent(html: string, metaName: string): string | null {
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+}
+
+function websocketBaseUrl(baseUrl: string): string {
+  return normalizeBaseUrl(baseUrl).replace(/^http:/, "ws:").replace(/^https:/, "wss:");
 }
 
 async function exists(targetPath: string): Promise<boolean> {
@@ -96,7 +126,6 @@ async function listFilesRecursively(rootPath: string): Promise<string[]> {
       if (entry.name === ".git") {
         continue;
       }
-
       const fullPath = path.join(currentPath, entry.name);
       if (entry.isDirectory()) {
         await walk(fullPath);
@@ -120,11 +149,80 @@ async function removeDirectoryContents(rootPath: string): Promise<void> {
   }
 }
 
+function flattenProjectTree(root: ProjectTreeFolder): ProjectEntity[] {
+  const entities: ProjectEntity[] = [];
+
+  function walk(folder: ProjectTreeFolder, parentPath: string, parentFolderId: string | null): void {
+    for (const childFolder of folder.folders ?? []) {
+      const childPath = parentPath ? `${parentPath}/${childFolder.name}` : childFolder.name;
+      entities.push({
+        id: childFolder._id,
+        name: childFolder.name,
+        type: "folder",
+        path: childPath,
+        parentFolderId: folder._id ?? parentFolderId
+      });
+      walk(childFolder, childPath, childFolder._id);
+    }
+
+    for (const fileRef of folder.fileRefs ?? []) {
+      const childPath = parentPath ? `${parentPath}/${fileRef.name}` : fileRef.name;
+      entities.push({
+        id: fileRef._id,
+        name: fileRef.name,
+        type: "file",
+        path: childPath,
+        parentFolderId: folder._id ?? parentFolderId
+      });
+    }
+
+    for (const doc of folder.docs ?? []) {
+      const childPath = parentPath ? `${parentPath}/${doc.name}` : doc.name;
+      entities.push({
+        id: doc._id,
+        name: doc.name,
+        type: "doc",
+        path: childPath,
+        parentFolderId: folder._id ?? parentFolderId
+      });
+    }
+  }
+
+  walk(root, "", root._id ?? null);
+  return entities.sort((left, right) => left.path.localeCompare(right.path));
+}
+
 export class OverleafClient {
   private readonly baseUrl: string;
 
   constructor(private readonly config: OverleafConfig) {
     this.baseUrl = normalizeBaseUrl(config.baseUrl);
+  }
+
+  async authStatus(): Promise<{
+    baseUrl: string;
+    sessionAuthenticated: boolean;
+    gitAuthenticated: boolean;
+    sessionMode: "browser-or-env" | "not-configured";
+  }> {
+    return {
+      baseUrl: this.baseUrl,
+      sessionAuthenticated: Boolean(this.config.credentials.sessionCookie),
+      gitAuthenticated: Boolean(this.config.credentials.gitToken),
+      sessionMode: this.config.credentials.sessionCookie ? "browser-or-env" : "not-configured"
+    };
+  }
+
+  async authLogin(): Promise<{ sessionAuthenticated: true }> {
+    const sessionCookie = await loginWithBrowser(this.baseUrl);
+    this.config.credentials.sessionCookie = sessionCookie;
+    return { sessionAuthenticated: true };
+  }
+
+  async authLogout(): Promise<{ sessionAuthenticated: false }> {
+    await clearStoredAuth();
+    this.config.credentials.sessionCookie = undefined;
+    return { sessionAuthenticated: false };
   }
 
   async listProjects(): Promise<OverleafProjectSummary[]> {
@@ -135,7 +233,7 @@ export class OverleafClient {
     const tagsBlob = extractMetaContent(html, "ol-tags");
 
     if (!projectsBlob) {
-      throw new Error("Unable to load Overleaf projects. Check OVERLEAF_SESSION.");
+      throw new Error("Unable to load Overleaf projects. Check session authentication.");
     }
 
     const projectData = JSON.parse(projectsBlob) as DashboardProjectBlob;
@@ -196,77 +294,127 @@ export class OverleafClient {
   }
 
   async listFiles(input: ListFilesInput): Promise<{ files: string[] }> {
-    assertAuthForMode(this.config, "git");
-    const repoPath = await this.ensureManagedRepo(input.projectId);
-    const files = await listFilesRecursively(repoPath);
+    if (this.hasGitToken()) {
+      const repoPath = await this.ensureManagedRepo(input.projectId);
+      const files = await listFilesRecursively(repoPath);
+      const extension = input.extension;
+      return { files: extension ? files.filter((filePath) => filePath.endsWith(extension)) : files };
+    }
+
+    assertAuthForMode(this.config, "session");
+    const tree = await this.getProjectTree(input.projectId);
+    const files = flattenProjectTree(tree)
+      .filter((entity) => entity.type !== "folder")
+      .map((entity) => entity.path);
     const extension = input.extension;
-    return {
-      files: extension ? files.filter((filePath) => filePath.endsWith(extension)) : files
-    };
+    return { files: extension ? files.filter((filePath) => filePath.endsWith(extension)) : files };
   }
 
   async readFile(input: ReadFileInput): Promise<{ path: string; content: string }> {
-    assertAuthForMode(this.config, "git");
-    const repoPath = await this.ensureManagedRepo(input.projectId);
-    const resolvedPath = this.resolveRepoPath(repoPath, input.path);
-    const content = await fs.readFile(resolvedPath, "utf-8");
-    return { path: input.path, content };
+    if (this.hasGitToken()) {
+      const repoPath = await this.ensureManagedRepo(input.projectId);
+      const resolvedPath = this.resolveRepoPath(repoPath, input.path);
+      const content = await fs.readFile(resolvedPath, "utf-8");
+      return { path: input.path, content };
+    }
+
+    assertAuthForMode(this.config, "session");
+    const zip = await this.downloadProjectZip(input.projectId);
+    const entry = zip.getEntry(input.path);
+    if (!entry) {
+      throw new Error(`File not found in project archive: ${input.path}`);
+    }
+    return { path: input.path, content: entry.getData().toString("utf-8") };
   }
 
   async createFile(input: CreateFileInput): Promise<{ path: string; committed: boolean }> {
-    assertAuthForMode(this.config, "git");
-    const repoPath = await this.ensureManagedRepo(input.projectId);
-    const resolvedPath = this.resolveRepoPath(repoPath, input.path);
-    if (await exists(resolvedPath)) {
-      throw new Error(`File already exists: ${input.path}`);
+    if (this.hasGitToken()) {
+      const repoPath = await this.ensureManagedRepo(input.projectId);
+      const resolvedPath = this.resolveRepoPath(repoPath, input.path);
+      if (await exists(resolvedPath)) {
+        throw new Error(`File already exists: ${input.path}`);
+      }
+      await ensureDirectory(path.dirname(resolvedPath));
+      await fs.writeFile(resolvedPath, input.content, "utf-8");
+      await this.commitAndPush(repoPath, `Create ${input.path}`);
+      return { path: input.path, committed: true };
     }
 
-    await ensureDirectory(path.dirname(resolvedPath));
-    await fs.writeFile(resolvedPath, input.content, "utf-8");
-    await this.commitAndPush(repoPath, `Create ${input.path}`);
+    assertAuthForMode(this.config, "session");
+    await this.sessionCreateOrUpdateFile(input.projectId, input.path, input.content, false);
     return { path: input.path, committed: true };
   }
 
   async updateFile(input: UpdateFileInput): Promise<{ path: string; committed: boolean }> {
-    assertAuthForMode(this.config, "git");
-    const repoPath = await this.ensureManagedRepo(input.projectId);
-    const resolvedPath = this.resolveRepoPath(repoPath, input.path);
-    await ensureDirectory(path.dirname(resolvedPath));
-    await fs.writeFile(resolvedPath, input.content, "utf-8");
-    await this.commitAndPush(repoPath, `Update ${input.path}`);
+    if (this.hasGitToken()) {
+      const repoPath = await this.ensureManagedRepo(input.projectId);
+      const resolvedPath = this.resolveRepoPath(repoPath, input.path);
+      await ensureDirectory(path.dirname(resolvedPath));
+      await fs.writeFile(resolvedPath, input.content, "utf-8");
+      await this.commitAndPush(repoPath, `Update ${input.path}`);
+      return { path: input.path, committed: true };
+    }
+
+    assertAuthForMode(this.config, "session");
+    await this.sessionCreateOrUpdateFile(input.projectId, input.path, input.content, true);
     return { path: input.path, committed: true };
   }
 
   async deleteFile(input: DeleteFileInput): Promise<{ path: string; committed: boolean }> {
-    assertAuthForMode(this.config, "git");
-    const repoPath = await this.ensureManagedRepo(input.projectId);
-    const resolvedPath = this.resolveRepoPath(repoPath, input.path);
-    await fs.rm(resolvedPath, { force: true, recursive: true });
-    await this.commitAndPush(repoPath, `Delete ${input.path}`);
+    if (this.hasGitToken()) {
+      const repoPath = await this.ensureManagedRepo(input.projectId);
+      const resolvedPath = this.resolveRepoPath(repoPath, input.path);
+      await fs.rm(resolvedPath, { force: true, recursive: true });
+      await this.commitAndPush(repoPath, `Delete ${input.path}`);
+      return { path: input.path, committed: true };
+    }
+
+    assertAuthForMode(this.config, "session");
+    const tree = await this.getProjectTree(input.projectId);
+    const entity = flattenProjectTree(tree).find((candidate) => candidate.path === input.path);
+    if (!entity || entity.type === "folder") {
+      throw new Error(`File not found: ${input.path}`);
+    }
+    await this.deleteEntity(input.projectId, entity.id, entity.type);
     return { path: input.path, committed: true };
   }
 
   async uploadFiles(input: UploadFilesInput): Promise<{ uploaded: string[]; committed: boolean }> {
-    assertAuthForMode(this.config, "git");
-    const repoPath = await this.ensureManagedRepo(input.projectId);
-    const uploaded: string[] = [];
+    if (this.hasGitToken()) {
+      const repoPath = await this.ensureManagedRepo(input.projectId);
+      const uploaded: string[] = [];
 
+      for (const sourcePath of input.paths) {
+        const absoluteSource = path.resolve(sourcePath);
+        if (!(await exists(absoluteSource))) {
+          throw new Error(`Upload source not found: ${sourcePath}`);
+        }
+        const destination = path.join(repoPath, path.basename(absoluteSource));
+        await copyPath(absoluteSource, destination);
+        uploaded.push(path.relative(repoPath, destination));
+      }
+
+      await this.commitAndPush(repoPath, "Upload project files");
+      return { uploaded, committed: true };
+    }
+
+    assertAuthForMode(this.config, "session");
+    const uploaded: string[] = [];
+    const tree = await this.getProjectTree(input.projectId);
+    const rootFolderId = tree._id;
     for (const sourcePath of input.paths) {
       const absoluteSource = path.resolve(sourcePath);
       if (!(await exists(absoluteSource))) {
         throw new Error(`Upload source not found: ${sourcePath}`);
       }
-      const destination = path.join(repoPath, path.basename(absoluteSource));
-      await copyPath(absoluteSource, destination);
-      uploaded.push(path.relative(repoPath, destination));
+      const uploadedPaths = await this.uploadLocalPathToProject(input.projectId, absoluteSource, rootFolderId, "");
+      uploaded.push(...uploadedPaths);
     }
-
-    await this.commitAndPush(repoPath, "Upload project files");
     return { uploaded, committed: true };
   }
 
   async uploadProjectArchive(input: UploadProjectArchiveInput): Promise<{ projectId: string; projectName: string }> {
-    assertAuthForMode(this.config, "hybrid");
+    assertAuthForMode(this.config, "session");
     const archivePath = path.resolve(input.archivePath);
     if (!(await exists(archivePath))) {
       throw new Error(`Archive not found: ${input.archivePath}`);
@@ -274,11 +422,24 @@ export class OverleafClient {
 
     const projectName = input.projectName ?? path.basename(archivePath, path.extname(archivePath));
     const { projectId } = await this.createProject({ name: projectName });
-    const repoPath = await this.ensureManagedRepo(projectId);
-    await removeDirectoryContents(repoPath);
-    await this.extractArchive(archivePath, repoPath);
-    await this.commitAndPush(repoPath, `Upload archive for ${projectName}`);
-    return { projectId, projectName };
+
+    if (this.hasGitToken()) {
+      const repoPath = await this.ensureManagedRepo(projectId);
+      await removeDirectoryContents(repoPath);
+      await this.extractArchive(archivePath, repoPath);
+      await this.commitAndPush(repoPath, `Upload archive for ${projectName}`);
+      return { projectId, projectName };
+    }
+
+    const extractionRoot = await fs.mkdtemp(path.join(os.tmpdir(), "overleafmcp-archive-"));
+    try {
+      await this.extractArchive(archivePath, extractionRoot);
+      const tree = await this.getProjectTree(projectId);
+      await this.uploadLocalPathToProject(projectId, extractionRoot, tree._id, "");
+      return { projectId, projectName };
+    } finally {
+      await fs.rm(extractionRoot, { recursive: true, force: true });
+    }
   }
 
   async compileProject(input: CompileProjectInput): Promise<{ status: string; outputFiles: unknown[] }> {
@@ -389,6 +550,68 @@ export class OverleafClient {
     return { localPath, pushed: true };
   }
 
+  private hasGitToken(): boolean {
+    return Boolean(this.config.credentials.gitToken);
+  }
+
+  private async sessionCreateOrUpdateFile(
+    projectId: string,
+    filePath: string,
+    content: string,
+    overwrite: boolean
+  ): Promise<void> {
+    const tree = await this.getProjectTree(projectId);
+    const entities = flattenProjectTree(tree);
+    const existing = entities.find((candidate) => candidate.path === filePath);
+    if (existing && existing.type === "folder") {
+      throw new Error(`A folder already exists at ${filePath}`);
+    }
+    if (existing && !overwrite) {
+      throw new Error(`File already exists: ${filePath}`);
+    }
+    if (!existing && overwrite) {
+      throw new Error(`File does not exist: ${filePath}`);
+    }
+    if (existing) {
+      await this.deleteEntity(projectId, existing.id, existing.type);
+    }
+
+    const parentPath = path.posix.dirname(filePath) === "." ? "" : path.posix.dirname(filePath);
+    const parentFolderId = await this.ensureProjectFolder(projectId, tree, parentPath);
+    await this.uploadBufferToFolder(projectId, parentFolderId, path.posix.basename(filePath), Buffer.from(content, "utf-8"));
+  }
+
+  private async uploadLocalPathToProject(
+    projectId: string,
+    sourcePath: string,
+    parentFolderId: string,
+    prefix: string
+  ): Promise<string[]> {
+    const stat = await fs.stat(sourcePath);
+    if (stat.isFile()) {
+      const content = await fs.readFile(sourcePath);
+      const uploadedPath = prefix ? `${prefix}/${path.basename(sourcePath)}` : path.basename(sourcePath);
+      await this.uploadBufferToFolder(projectId, parentFolderId, path.basename(sourcePath), content);
+      return [uploadedPath];
+    }
+
+    const folderName = path.basename(sourcePath);
+    const nextPrefix = prefix ? `${prefix}/${folderName}` : folderName;
+    const createdFolderId = await this.createFolder(projectId, parentFolderId, folderName);
+    const entries = await fs.readdir(sourcePath);
+    const uploaded: string[] = [];
+    for (const entry of entries) {
+      const childUploaded = await this.uploadLocalPathToProject(
+        projectId,
+        path.join(sourcePath, entry),
+        createdFolderId,
+        nextPrefix
+      );
+      uploaded.push(...childUploaded);
+    }
+    return uploaded;
+  }
+
   private async fetchWithSession(resourcePath: string): Promise<Response> {
     const response = await fetch(`${this.baseUrl}${resourcePath}`, {
       headers: {
@@ -407,7 +630,7 @@ export class OverleafClient {
   private cookieHeader(): string {
     const sessionCookie = this.config.credentials.sessionCookie;
     if (!sessionCookie) {
-      throw new Error("OVERLEAF_SESSION is required.");
+      throw new Error("No Overleaf session is configured. Use browser login first.");
     }
     return `overleaf_session2=${sessionCookie}`;
   }
@@ -430,6 +653,191 @@ export class OverleafClient {
       throw new Error(`Unable to find CSRF token for project ${projectId}.`);
     }
     return csrfToken;
+  }
+
+  private async getProjectTree(projectId: string): Promise<ProjectTreeFolder> {
+    const handshakeResponse = await this.fetchWithSession(`/socket.io/1/?projectId=${projectId}&t=${Date.now()}`);
+    const handshakeText = await handshakeResponse.text();
+    const socketId = handshakeText.split(":")[0];
+    if (!socketId) {
+      throw new Error("Unable to establish Overleaf project socket session.");
+    }
+
+    const wsUrl = `${websocketBaseUrl(this.baseUrl)}/socket.io/1/websocket/${socketId}?projectId=${projectId}`;
+
+    return await new Promise<ProjectTreeFolder>((resolve, reject) => {
+      const socket = new WebSocket(wsUrl, {
+        headers: {
+          Cookie: this.cookieHeader()
+        }
+      });
+
+      const timeout = setTimeout(() => {
+        socket.close();
+        reject(new Error("Timed out waiting for Overleaf project tree."));
+      }, 30000);
+
+      socket.on("message", (message: RawData) => {
+        const text = message.toString();
+        if (text.startsWith("7:")) {
+          clearTimeout(timeout);
+          socket.close();
+          reject(new Error("Overleaf project socket authentication failed."));
+          return;
+        }
+
+        if (!text.startsWith("5:")) {
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(text.slice(2).replace(/^:+/, "")) as {
+            name?: string;
+            args?: Array<{ project?: { rootFolder?: ProjectTreeFolder[] } }>;
+          };
+
+          if (parsed.name !== "joinProjectResponse") {
+            return;
+          }
+
+          const rootFolder = parsed.args?.[0]?.project?.rootFolder?.[0];
+          if (!rootFolder) {
+            throw new Error("Project tree response did not include a root folder.");
+          }
+
+          clearTimeout(timeout);
+          socket.close();
+          resolve(rootFolder);
+        } catch (error) {
+          clearTimeout(timeout);
+          socket.close();
+          reject(error);
+        }
+      });
+
+      socket.on("error", (error: Error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+    });
+  }
+
+  private async createFolder(projectId: string, parentFolderId: string, name: string): Promise<string> {
+    const csrfToken = await this.getProjectCsrfToken(projectId);
+    const response = await fetch(`${this.baseUrl}/project/${projectId}/folder`, {
+      method: "POST",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        parent_folder_id: parentFolderId,
+        name
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`createFolder failed with HTTP ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { _id?: string };
+    if (!payload._id) {
+      throw new Error(`createFolder did not return an entity id for ${name}`);
+    }
+    return payload._id;
+  }
+
+  private async uploadBufferToFolder(
+    projectId: string,
+    folderId: string,
+    fileName: string,
+    fileContent: Buffer
+  ): Promise<void> {
+    const csrfToken = await this.getProjectCsrfToken(projectId);
+    const form = new FormData();
+    form.set("relativePath", "null");
+    form.set("name", fileName);
+    form.set("type", "application/octet-stream");
+    form.set("qqfile", new Blob([fileContent]), fileName);
+
+    const response = await fetch(`${this.baseUrl}/project/${projectId}/upload?folder_id=${folderId}`, {
+      method: "POST",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: form
+    });
+
+    if (!response.ok) {
+      throw new Error(`uploadBufferToFolder failed with HTTP ${response.status}`);
+    }
+  }
+
+  private async deleteEntity(projectId: string, entityId: string, entityType: ProjectEntityType): Promise<void> {
+    const csrfToken = await this.getProjectCsrfToken(projectId);
+    const response = await fetch(`${this.baseUrl}/project/${projectId}/${entityType}/${entityId}`, {
+      method: "DELETE",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      throw new Error(`deleteEntity failed with HTTP ${response.status}`);
+    }
+  }
+
+  private async ensureProjectFolder(projectId: string, tree: ProjectTreeFolder, folderPath: string): Promise<string> {
+    if (!folderPath) {
+      return tree._id;
+    }
+
+    const segments = folderPath.split("/").filter(Boolean);
+    let currentFolder = tree;
+
+    for (const segment of segments) {
+      const nextFolder = (currentFolder.folders ?? []).find((folder) => folder.name === segment);
+      if (nextFolder) {
+        currentFolder = nextFolder;
+        continue;
+      }
+
+      const newFolderId = await this.createFolder(projectId, currentFolder._id, segment);
+      const createdFolder: ProjectTreeFolder = {
+        _id: newFolderId,
+        name: segment,
+        folders: [],
+        fileRefs: [],
+        docs: []
+      };
+      currentFolder.folders = currentFolder.folders ?? [];
+      currentFolder.folders.push(createdFolder);
+      currentFolder = createdFolder;
+    }
+
+    return currentFolder._id;
+  }
+
+  private async downloadProjectZip(projectId: string): Promise<AdmZip> {
+    const response = await fetch(`${this.baseUrl}/project/${projectId}/download/zip`, {
+      headers: {
+        Cookie: this.cookieHeader()
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`downloadProjectZip failed with HTTP ${response.status}`);
+    }
+
+    return new AdmZip(Buffer.from(await response.arrayBuffer()));
   }
 
   private async ensureManagedRepo(projectId: string): Promise<string> {
@@ -456,7 +864,7 @@ export class OverleafClient {
   private gitRemoteUrl(projectId: string): string {
     const token = this.config.credentials.gitToken;
     if (!token) {
-      throw new Error("OVERLEAF_GIT_TOKEN is required.");
+      throw new Error("OVERLEAF_GIT_TOKEN is required for Git-based operations.");
     }
     return `https://git:${token}@${this.config.gitHost}/${projectId}`;
   }

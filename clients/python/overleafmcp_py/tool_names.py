@@ -1,4 +1,7 @@
 class OverleafToolName:
+    AUTH_STATUS = "overleaf_auth_status"
+    AUTH_LOGIN = "overleaf_auth_login"
+    AUTH_LOGOUT = "overleaf_auth_logout"
     LIST_PROJECTS = "overleaf_list_projects"
     LIST_FILES = "overleaf_list_files"
     READ_FILE = "overleaf_read_file"

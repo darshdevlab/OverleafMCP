@@ -1,6 +1,9 @@
 package overleafmcp
 
 const (
+	ToolAuthStatus          = "overleaf_auth_status"
+	ToolAuthLogin           = "overleaf_auth_login"
+	ToolAuthLogout          = "overleaf_auth_logout"
 	ToolListProjects         = "overleaf_list_projects"
 	ToolListFiles            = "overleaf_list_files"
 	ToolReadFile             = "overleaf_read_file"

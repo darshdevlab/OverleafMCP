@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readStoredAuthSync } from "./auth-store.js";
 import type { OverleafConfig } from "./types.js";
 
 const envSchema = z.object({
@@ -14,7 +15,9 @@ const envSchema = z.object({
 
 export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): OverleafConfig {
   const parsed = envSchema.parse(env);
-  const hasSession = Boolean(parsed.OVERLEAF_SESSION);
+  const storedAuth = readStoredAuthSync();
+  const sessionCookie = parsed.OVERLEAF_SESSION ?? storedAuth.sessionCookie;
+  const hasSession = Boolean(sessionCookie);
   const hasGit = Boolean(parsed.OVERLEAF_GIT_TOKEN);
 
   const authMode = hasSession && hasGit ? "hybrid" : hasSession ? "session" : hasGit ? "git" : "session";
@@ -27,7 +30,7 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Overlea
     gitAuthorEmail: parsed.OVERLEAF_GIT_AUTHOR_EMAIL ?? "mcp@overleaf.local",
     authMode,
     credentials: {
-      sessionCookie: parsed.OVERLEAF_SESSION,
+      sessionCookie,
       gitToken: parsed.OVERLEAF_GIT_TOKEN,
       gitUsername: parsed.OVERLEAF_EMAIL
     }
