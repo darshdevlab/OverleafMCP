@@ -75,6 +75,10 @@ export interface DownloadPdfInput {
   outputPath?: string;
 }
 
+export interface DeleteProjectInput {
+  projectId: string;
+}
+
 export interface SyncProjectInput {
   projectId: string;
   localPath: string;

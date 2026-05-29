@@ -158,6 +158,14 @@
       }
     },
     {
+      "name": "overleaf_delete_project",
+      "description": "Delete an Overleaf project that the authenticated user can administer.",
+      "auth": "session",
+      "arguments": {
+        "projectId": "string"
+      }
+    },
+    {
       "name": "overleaf_compile_project",
       "description": "Trigger project compilation.",
       "auth": "session",

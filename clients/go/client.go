@@ -155,6 +155,12 @@ func (c *Client) RemoveProjectTags(ctx context.Context, projectID string, tagIDs
 	return c.CallToolText(ctx, ToolRemoveProjectTags, payload)
 }
 
+func (c *Client) DeleteProject(ctx context.Context, projectID string) (string, error) {
+	return c.CallToolText(ctx, ToolDeleteProject, map[string]any{
+		"projectId": projectID,
+	})
+}
+
 func (c *Client) CreateFile(ctx context.Context, projectID string, path string, content string) (string, error) {
 	return c.CallToolText(ctx, ToolCreateFile, map[string]any{
 		"projectId": projectID,

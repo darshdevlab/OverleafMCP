@@ -17,6 +17,7 @@ class OverleafToolName:
     DELETE_FILE = "overleaf_delete_file"
     UPLOAD_FILES = "overleaf_upload_files"
     UPLOAD_PROJECT_ARCHIVE = "overleaf_upload_project_archive"
+    DELETE_PROJECT = "overleaf_delete_project"
     COMPILE_PROJECT = "overleaf_compile_project"
     DOWNLOAD_PDF = "overleaf_download_pdf"
     SYNC_PULL = "overleaf_sync_pull"

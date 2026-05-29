@@ -152,6 +152,13 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    toolSchemas.deleteProject.name,
+    toolSchemas.deleteProject.description,
+    toolSchemas.deleteProject.inputSchema.shape,
+    async (input) => formatResult(await client.deleteProject(toolSchemas.deleteProject.inputSchema.parse(input)))
+  );
+
+  server.tool(
     toolSchemas.compileProject.name,
     toolSchemas.compileProject.description,
     toolSchemas.compileProject.inputSchema.shape,

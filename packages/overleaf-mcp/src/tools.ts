@@ -149,6 +149,13 @@ export const toolSchemas = {
       projectName: z.string().min(1).optional()
     })
   },
+  deleteProject: {
+    name: "overleaf_delete_project",
+    description: "Delete an Overleaf project that the authenticated user can administer.",
+    inputSchema: z.object({
+      projectId: z.string().min(1)
+    })
+  },
   compileProject: {
     name: "overleaf_compile_project",
     description: "Trigger project compilation.",

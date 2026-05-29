@@ -54,6 +54,8 @@ This repository currently provides:
 - live project listing via session auth
 - live tag listing, creation, edit, deletion, and project assignment via session auth
 - live blank/template project creation via session auth
+- live archive-to-project import via Overleaf's native project upload route in session-only mode
+- live project deletion via session auth
 - live session-first file create, read, update, delete, and upload operations
 - live Git-backed file and repository sync when an Overleaf Git token is configured
 - live compile and PDF download via session auth
@@ -209,6 +211,7 @@ Useful first checks after setup:
 - `Run overleaf_list_tags`
 - `Create an Overleaf tag named "mcp-test-tag"`
 - `Create a new Overleaf project named "MCP Connection Test" with tags [{"name":"mcp-test-tag"}]`
+- `Delete project <projectId>` with `overleaf_delete_project`
 
 If you prefer, you can replace the absolute `args[0]` path with your own local checkout path.
 

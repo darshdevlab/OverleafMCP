@@ -181,6 +181,12 @@ class OverleafMCPClient:
             {"archivePath": archive_path, "projectName": project_name},
         )
 
+    async def delete_project(self, project_id: str) -> Any:
+        return await self.call_tool(
+            OverleafToolName.DELETE_PROJECT,
+            {"projectId": project_id},
+        )
+
     async def compile_project(self, project_id: str) -> Any:
         return await self.call_tool(
             OverleafToolName.COMPILE_PROJECT,

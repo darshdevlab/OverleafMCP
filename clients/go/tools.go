@@ -19,6 +19,7 @@ const (
 	ToolDeleteFile           = "overleaf_delete_file"
 	ToolUploadFiles          = "overleaf_upload_files"
 	ToolUploadProjectArchive = "overleaf_upload_project_archive"
+	ToolDeleteProject        = "overleaf_delete_project"
 	ToolCompileProject       = "overleaf_compile_project"
 	ToolDownloadPDF          = "overleaf_download_pdf"
 	ToolSyncPull             = "overleaf_sync_pull"

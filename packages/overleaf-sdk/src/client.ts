@@ -15,6 +15,7 @@ import type {
   CreateProjectInput,
   CreateTagInput,
   DeleteFileInput,
+  DeleteProjectInput,
   DeleteTagInput,
   DownloadPdfInput,
   EditTagInput,
@@ -380,10 +381,7 @@ export class OverleafClient {
     }
 
     assertAuthForMode(this.config, "session");
-    const tree = await this.getProjectTree(input.projectId);
-    const files = flattenProjectTree(tree)
-      .filter((entity) => entity.type !== "folder")
-      .map((entity) => entity.path);
+    const files = await this.getProjectEntities(input.projectId);
     const extension = input.extension;
     return { files: extension ? files.filter((filePath) => filePath.endsWith(extension)) : files };
   }
@@ -499,25 +497,48 @@ export class OverleafClient {
     }
 
     const projectName = input.projectName ?? path.basename(archivePath, path.extname(archivePath));
+    if (!this.hasGitToken()) {
+      return await this.uploadProjectArchiveDirect(archivePath, projectName);
+    }
+
     const { projectId } = await this.createProject({ name: projectName });
+    const repoPath = await this.ensureManagedRepo(projectId);
+    await removeDirectoryContents(repoPath);
+    await this.extractArchive(archivePath, repoPath);
+    await this.commitAndPush(repoPath, `Upload archive for ${projectName}`);
+    return { projectId, projectName };
+  }
 
-    if (this.hasGitToken()) {
-      const repoPath = await this.ensureManagedRepo(projectId);
-      await removeDirectoryContents(repoPath);
-      await this.extractArchive(archivePath, repoPath);
-      await this.commitAndPush(repoPath, `Upload archive for ${projectName}`);
-      return { projectId, projectName };
+  async deleteProject(input: DeleteProjectInput): Promise<{ projectId: string; deleted: true }> {
+    assertAuthForMode(this.config, "session");
+    const csrfToken = await this.getProjectCsrfToken(input.projectId);
+    const trashResponse = await fetch(`${this.baseUrl}/project/${input.projectId}/trash`, {
+      method: "POST",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "x-csrf-token": csrfToken
+      }
+    });
+
+    if (!trashResponse.ok) {
+      throw new Error(`deleteProject trash step failed with HTTP ${trashResponse.status}`);
     }
 
-    const extractionRoot = await fs.mkdtemp(path.join(os.tmpdir(), "overleafmcp-archive-"));
-    try {
-      await this.extractArchive(archivePath, extractionRoot);
-      const tree = await this.getProjectTree(projectId);
-      await this.uploadLocalPathToProject(projectId, extractionRoot, tree._id, "");
-      return { projectId, projectName };
-    } finally {
-      await fs.rm(extractionRoot, { recursive: true, force: true });
+    const deleteResponse = await fetch(`${this.baseUrl}/Project/${input.projectId}`, {
+      method: "DELETE",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "x-csrf-token": csrfToken
+      }
+    });
+
+    if (!deleteResponse.ok) {
+      throw new Error(`deleteProject failed with HTTP ${deleteResponse.status}`);
     }
+
+    return { projectId: input.projectId, deleted: true };
   }
 
   async compileProject(input: CompileProjectInput): Promise<{ status: string; outputFiles: unknown[] }> {
@@ -868,6 +889,26 @@ export class OverleafClient {
     return csrfToken;
   }
 
+  private async getProjectEntities(projectId: string): Promise<string[]> {
+    const response = await fetch(`${this.baseUrl}/project/${projectId}/entities`, {
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`getProjectEntities failed with HTTP ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { entities?: Array<{ path?: string; type?: string }> };
+    return (payload.entities ?? [])
+      .filter((entity) => entity.type === "doc" || entity.type === "file")
+      .map((entity) => entity.path ?? "")
+      .filter(Boolean)
+      .sort();
+  }
+
   private async getProjectTree(projectId: string): Promise<ProjectTreeFolder> {
     const handshakeResponse = await this.fetchWithSession(`/socket.io/1/?projectId=${projectId}&t=${Date.now()}`);
     const handshakeText = await handshakeResponse.text();
@@ -1132,5 +1173,36 @@ export class OverleafClient {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`git ${args.join(" ")} failed: ${message}`);
     }
+  }
+
+  private async uploadProjectArchiveDirect(
+    archivePath: string,
+    projectName: string
+  ): Promise<{ projectId: string; projectName: string }> {
+    const csrfToken = await this.getDashboardCsrfToken();
+    const form = new FormData();
+    form.set("name", projectName);
+    form.set("qqfile", new Blob([await fs.readFile(archivePath)]), path.basename(archivePath));
+
+    const response = await fetch(`${this.baseUrl}/project/new/upload`, {
+      method: "POST",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: form
+    });
+
+    if (!response.ok) {
+      throw new Error(`uploadProjectArchiveDirect failed with HTTP ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { success?: boolean; project_id?: string; error?: string };
+    if (!payload.success || !payload.project_id) {
+      throw new Error(`uploadProjectArchiveDirect did not return a project_id${payload.error ? `: ${payload.error}` : "."}`);
+    }
+
+    return { projectId: payload.project_id, projectName };
   }
 }

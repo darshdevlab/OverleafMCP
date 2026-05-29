@@ -200,6 +200,7 @@ If you want a stronger end-to-end test:
 1. `Create a new Overleaf project named "MCP Connection Test"`
 2. `Create file test.tex in that project with content \\section{Hello}`
 3. `Compile that project`
+4. `Delete that project with overleaf_delete_project`
 
 If you want a tag-specific test:
 
