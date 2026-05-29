@@ -82,6 +82,9 @@ class OverleafMCPClient:
     async def list_projects(self) -> Any:
         return await self.call_tool(OverleafToolName.LIST_PROJECTS)
 
+    async def list_tags(self) -> Any:
+        return await self.call_tool(OverleafToolName.LIST_TAGS)
+
     async def auth_status(self) -> Any:
         return await self.call_tool(OverleafToolName.AUTH_STATUS)
 
@@ -111,6 +114,41 @@ class OverleafMCPClient:
                 "templateId": template_id,
                 "tags": tags,
             },
+        )
+
+    async def create_tag(self, name: str, color: str | None = None) -> Any:
+        return await self.call_tool(
+            OverleafToolName.CREATE_TAG,
+            {"name": name, "color": color},
+        )
+
+    async def edit_tag(self, tag_id: str, name: str, color: str | None = None) -> Any:
+        return await self.call_tool(
+            OverleafToolName.EDIT_TAG,
+            {"tagId": tag_id, "name": name, "color": color},
+        )
+
+    async def delete_tag(self, tag_id: str) -> Any:
+        return await self.call_tool(
+            OverleafToolName.DELETE_TAG,
+            {"tagId": tag_id},
+        )
+
+    async def assign_project_tags(self, project_id: str, tags: list[dict[str, Any]]) -> Any:
+        return await self.call_tool(
+            OverleafToolName.ASSIGN_PROJECT_TAGS,
+            {"projectId": project_id, "tags": tags},
+        )
+
+    async def remove_project_tags(
+        self,
+        project_id: str,
+        tag_ids: list[str] | None = None,
+        tag_names: list[str] | None = None,
+    ) -> Any:
+        return await self.call_tool(
+            OverleafToolName.REMOVE_PROJECT_TAGS,
+            {"projectId": project_id, "tagIds": tag_ids, "tagNames": tag_names},
         )
 
     async def create_file(self, project_id: str, path: str, content: str) -> Any:

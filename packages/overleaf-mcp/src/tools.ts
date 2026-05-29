@@ -21,6 +21,60 @@ export const toolSchemas = {
     description: "List Overleaf projects visible to the authenticated user.",
     inputSchema: z.object({})
   },
+  listTags: {
+    name: "overleaf_list_tags",
+    description: "List Overleaf organization tags visible to the authenticated user.",
+    inputSchema: z.object({})
+  },
+  createTag: {
+    name: "overleaf_create_tag",
+    description: "Create an Overleaf organization tag.",
+    inputSchema: z.object({
+      name: z.string().min(1),
+      color: z.string().min(1).optional()
+    })
+  },
+  editTag: {
+    name: "overleaf_edit_tag",
+    description: "Rename or recolor an existing Overleaf organization tag.",
+    inputSchema: z.object({
+      tagId: z.string().min(1),
+      name: z.string().min(1),
+      color: z.string().min(1).optional()
+    })
+  },
+  deleteTag: {
+    name: "overleaf_delete_tag",
+    description: "Delete an Overleaf organization tag.",
+    inputSchema: z.object({
+      tagId: z.string().min(1)
+    })
+  },
+  assignProjectTags: {
+    name: "overleaf_assign_project_tags",
+    description: "Assign one or more tags to an Overleaf project. Tags can be referenced by id or created by name.",
+    inputSchema: z.object({
+      projectId: z.string().min(1),
+      tags: z
+        .array(
+          z.object({
+            id: z.string().min(1).optional(),
+            name: z.string().min(1).optional(),
+            color: z.string().min(1).optional()
+          })
+        )
+        .min(1)
+    })
+  },
+  removeProjectTags: {
+    name: "overleaf_remove_project_tags",
+    description: "Remove one or more tags from an Overleaf project by tag id or tag name.",
+    inputSchema: z.object({
+      projectId: z.string().min(1),
+      tagIds: z.array(z.string().min(1)).optional(),
+      tagNames: z.array(z.string().min(1)).optional()
+    })
+  },
   listFiles: {
     name: "overleaf_list_files",
     description: "List files in an Overleaf project via the Git-backed workflow.",

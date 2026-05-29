@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "overleaf": {
+      "command": "node",
+      "args": [
+        "/Volumes/LocalDrive1/MCPs/OverleafMCP/packages/overleaf-mcp/dist/index.js"
+      ],
+      "env": {
+        "OVERLEAF_BASE_URL": "https://www.overleaf.com"
+      }
+    }
+  }
+}

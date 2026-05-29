@@ -9,15 +9,21 @@ import { assertAuthForMode } from "./auth.js";
 import { clearStoredAuth } from "./auth-store.js";
 import { loginWithBrowser } from "./browser-auth.js";
 import type {
+  AssignProjectTagsInput,
   CompileProjectInput,
   CreateFileInput,
   CreateProjectInput,
+  CreateTagInput,
   DeleteFileInput,
+  DeleteTagInput,
   DownloadPdfInput,
+  EditTagInput,
   ListFilesInput,
   OverleafConfig,
   OverleafProjectSummary,
+  OverleafTagSummary,
   ReadFileInput,
+  RemoveProjectTagsInput,
   SyncProjectInput,
   UpdateFileInput,
   UploadFilesInput,
@@ -227,34 +233,107 @@ export class OverleafClient {
 
   async listProjects(): Promise<OverleafProjectSummary[]> {
     assertAuthForMode(this.config, "session");
-    const response = await this.fetchWithSession("/");
-    const html = await response.text();
-    const projectsBlob = extractMetaContent(html, "ol-prefetchedProjectsBlob");
-    const tagsBlob = extractMetaContent(html, "ol-tags");
-
-    if (!projectsBlob) {
-      throw new Error("Unable to load Overleaf projects. Check session authentication.");
-    }
-
-    const projectData = JSON.parse(projectsBlob) as DashboardProjectBlob;
-    const tags = tagsBlob ? (JSON.parse(tagsBlob) as DashboardTagBlob[]) : [];
-    const tagsByProjectId = new Map<string, string[]>();
-
-    for (const tag of tags) {
-      for (const projectId of tag.project_ids ?? []) {
-        const current = tagsByProjectId.get(projectId) ?? [];
-        current.push(tag.name);
-        tagsByProjectId.set(projectId, current);
-      }
-    }
+    const { projectData, tags } = await this.getDashboardData();
 
     return (projectData.projects ?? [])
       .filter((project) => !project.trashed && !project.archived)
       .map((project) => ({
         id: project.id,
         name: project.name,
-        tags: (tagsByProjectId.get(project.id) ?? []).sort()
+        tags: tags.filter((tag) => (tag.project_ids ?? []).includes(project.id)).map((tag) => tag.name).sort()
       }));
+  }
+
+  async listTags(): Promise<OverleafTagSummary[]> {
+    assertAuthForMode(this.config, "session");
+    const tags = await this.getTags();
+    return tags.map((tag) => ({
+      id: tag._id,
+      name: tag.name,
+      color: tag.color,
+      projectIds: [...(tag.project_ids ?? [])].sort()
+    }));
+  }
+
+  async createTag(input: CreateTagInput): Promise<OverleafTagSummary> {
+    assertAuthForMode(this.config, "session");
+    const tag = await this.createTagRecord(input.name, input.color);
+    return this.toTagSummary(tag);
+  }
+
+  async editTag(input: EditTagInput): Promise<{ tagId: string; updated: true }> {
+    assertAuthForMode(this.config, "session");
+    const csrfToken = await this.getDashboardCsrfToken();
+    const response = await fetch(`${this.baseUrl}/tag/${input.tagId}/edit`, {
+      method: "POST",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        name: input.name,
+        color: input.color
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`editTag failed with HTTP ${response.status}`);
+    }
+
+    return { tagId: input.tagId, updated: true };
+  }
+
+  async deleteTag(input: DeleteTagInput): Promise<{ tagId: string; deleted: true }> {
+    assertAuthForMode(this.config, "session");
+    const csrfToken = await this.getDashboardCsrfToken();
+    const response = await fetch(`${this.baseUrl}/tag/${input.tagId}`, {
+      method: "DELETE",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "x-csrf-token": csrfToken
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`deleteTag failed with HTTP ${response.status}`);
+    }
+
+    return { tagId: input.tagId, deleted: true };
+  }
+
+  async assignProjectTags(input: AssignProjectTagsInput): Promise<{ projectId: string; tagIds: string[] }> {
+    assertAuthForMode(this.config, "session");
+    const tagIds = await this.resolveTagIds(input.tags);
+    await this.addProjectToTagIds(input.projectId, tagIds);
+    return { projectId: input.projectId, tagIds };
+  }
+
+  async removeProjectTags(input: RemoveProjectTagsInput): Promise<{ projectId: string; removedTagIds: string[] }> {
+    assertAuthForMode(this.config, "session");
+    const existingTags = await this.getTags();
+    const tagIds = new Set<string>();
+
+    for (const tagId of input.tagIds ?? []) {
+      tagIds.add(tagId);
+    }
+
+    for (const tagName of input.tagNames ?? []) {
+      const tag = existingTags.find((candidate) => candidate.name === tagName);
+      if (tag) {
+        tagIds.add(tag._id);
+      }
+    }
+
+    const removedTagIds: string[] = [];
+    for (const tagId of tagIds) {
+      await this.removeProjectFromTag(tagId, input.projectId);
+      removedTagIds.push(tagId);
+    }
+
+    return { projectId: input.projectId, removedTagIds: removedTagIds.sort() };
   }
 
   async createProject(input: CreateProjectInput): Promise<{ projectId: string; warnings?: string[] }> {
@@ -285,12 +364,11 @@ export class OverleafClient {
       throw new Error("createProject did not return a project_id.");
     }
 
-    const warnings =
-      input.tags && input.tags.length > 0
-        ? ["Project tags were requested but are not implemented yet in the TypeScript transport layer."]
-        : undefined;
+    if (input.tags && input.tags.length > 0) {
+      await this.assignProjectTags({ projectId: payload.project_id, tags: input.tags });
+    }
 
-    return { projectId: payload.project_id, warnings };
+    return { projectId: payload.project_id };
   }
 
   async listFiles(input: ListFilesInput): Promise<{ files: string[] }> {
@@ -643,6 +721,141 @@ export class OverleafClient {
       throw new Error("Unable to find dashboard CSRF token.");
     }
     return csrfToken;
+  }
+
+  private async getDashboardData(): Promise<{ projectData: DashboardProjectBlob; tags: DashboardTagBlob[] }> {
+    const response = await this.fetchWithSession("/");
+    const html = await response.text();
+    const projectsBlob = extractMetaContent(html, "ol-prefetchedProjectsBlob");
+    const tagsBlob = extractMetaContent(html, "ol-tags");
+
+    if (!projectsBlob) {
+      throw new Error("Unable to load Overleaf projects. Check session authentication.");
+    }
+
+    return {
+      projectData: JSON.parse(projectsBlob) as DashboardProjectBlob,
+      tags: tagsBlob ? (JSON.parse(tagsBlob) as DashboardTagBlob[]) : []
+    };
+  }
+
+  private async getTags(): Promise<DashboardTagBlob[]> {
+    const response = await fetch(`${this.baseUrl}/tag`, {
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`getTags failed with HTTP ${response.status}`);
+    }
+
+    return (await response.json()) as DashboardTagBlob[];
+  }
+
+  private async createTagRecord(name: string, color?: string): Promise<DashboardTagBlob> {
+    const csrfToken = await this.getDashboardCsrfToken();
+    const response = await fetch(`${this.baseUrl}/tag`, {
+      method: "POST",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({ name, color })
+    });
+
+    if (!response.ok) {
+      throw new Error(`createTag failed with HTTP ${response.status}`);
+    }
+
+    return (await response.json()) as DashboardTagBlob;
+  }
+
+  private async resolveTagIds(
+    tags: Array<{
+      id?: string;
+      name?: string;
+      color?: string;
+    }>
+  ): Promise<string[]> {
+    const existingTags = await this.getTags();
+    const resolvedTagIds = new Set<string>();
+
+    for (const tag of tags) {
+      if (tag.id) {
+        resolvedTagIds.add(tag.id);
+        continue;
+      }
+
+      if (!tag.name) {
+        throw new Error("Each tag reference must include either an id or a name.");
+      }
+
+      const existing = existingTags.find((candidate) => candidate.name === tag.name);
+      if (existing) {
+        resolvedTagIds.add(existing._id);
+        continue;
+      }
+
+      const created = await this.createTagRecord(tag.name, tag.color);
+      resolvedTagIds.add(created._id);
+    }
+
+    return [...resolvedTagIds].sort();
+  }
+
+  private async addProjectToTagIds(projectId: string, tagIds: string[]): Promise<void> {
+    if (tagIds.length === 0) {
+      return;
+    }
+
+    const csrfToken = await this.getDashboardCsrfToken();
+    for (const tagId of tagIds) {
+      const response = await fetch(`${this.baseUrl}/tag/${tagId}/projects`, {
+        method: "POST",
+        headers: {
+          Cookie: this.cookieHeader(),
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          projectIds: [projectId]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`assignProjectTags failed with HTTP ${response.status} for tag ${tagId}`);
+      }
+    }
+  }
+
+  private async removeProjectFromTag(tagId: string, projectId: string): Promise<void> {
+    const csrfToken = await this.getDashboardCsrfToken();
+    const response = await fetch(`${this.baseUrl}/tag/${tagId}/project/${projectId}`, {
+      method: "DELETE",
+      headers: {
+        Cookie: this.cookieHeader(),
+        Accept: "application/json",
+        "x-csrf-token": csrfToken
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`removeProjectFromTag failed with HTTP ${response.status} for tag ${tagId}`);
+    }
+  }
+
+  private toTagSummary(tag: DashboardTagBlob): OverleafTagSummary {
+    return {
+      id: tag._id,
+      name: tag.name,
+      color: tag.color,
+      projectIds: [...(tag.project_ids ?? [])].sort()
+    };
   }
 
   private async getProjectCsrfToken(projectId: string): Promise<string> {

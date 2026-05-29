@@ -21,6 +21,12 @@ export interface ProjectTagInput {
   color?: string;
 }
 
+export interface ProjectTagReferenceInput {
+  id?: string;
+  name?: string;
+  color?: string;
+}
+
 export interface CreateProjectInput {
   name: string;
   templateId?: string;
@@ -74,8 +80,41 @@ export interface SyncProjectInput {
   localPath: string;
 }
 
+export interface CreateTagInput {
+  name: string;
+  color?: string;
+}
+
+export interface EditTagInput {
+  tagId: string;
+  name: string;
+  color?: string;
+}
+
+export interface DeleteTagInput {
+  tagId: string;
+}
+
+export interface AssignProjectTagsInput {
+  projectId: string;
+  tags: ProjectTagReferenceInput[];
+}
+
+export interface RemoveProjectTagsInput {
+  projectId: string;
+  tagIds?: string[];
+  tagNames?: string[];
+}
+
 export interface OverleafProjectSummary {
   id: string;
   name: string;
   tags: string[];
+}
+
+export interface OverleafTagSummary {
+  id: string;
+  name: string;
+  color?: string;
+  projectIds: string[];
 }

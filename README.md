@@ -52,6 +52,7 @@ This repository currently provides:
 - a shared contract file for the tool surface
 - browser-driven login that captures and stores the Overleaf session locally
 - live project listing via session auth
+- live tag listing, creation, edit, deletion, and project assignment via session auth
 - live blank/template project creation via session auth
 - live session-first file create, read, update, delete, and upload operations
 - live Git-backed file and repository sync when an Overleaf Git token is configured
@@ -60,7 +61,6 @@ This repository currently provides:
 
 Still pending:
 
-- project tag creation and assignment
 - broader browser-driven project management flows beyond the current HTTP and Git transport coverage
 
 ## Security Model
@@ -169,6 +169,48 @@ Example `stdio` configuration:
 ```
 
 Add `OVERLEAF_GIT_TOKEN` and `OVERLEAF_EMAIL` only if you want Git-backed sync behavior.
+
+## Codex Setup
+
+Yes, you can keep the Codex MCP setup in the same repo.
+
+For full host-specific setup instructions, see [SETUP.md](/Volumes/LocalDrive1/MCPs/OverleafMCP/SETUP.md).
+
+This repo includes a ready example config at [codex.mcp.json](/Volumes/LocalDrive1/MCPs/OverleafMCP/codex.mcp.json).
+
+It points Codex at the locally built server:
+
+```json
+{
+  "mcpServers": {
+    "overleaf": {
+      "command": "node",
+      "args": [
+        "/Volumes/LocalDrive1/MCPs/OverleafMCP/packages/overleaf-mcp/dist/index.js"
+      ],
+      "env": {
+        "OVERLEAF_BASE_URL": "https://www.overleaf.com"
+      }
+    }
+  }
+}
+```
+
+Recommended usage:
+
+1. Build the repo with `npm run build`
+2. Use the contents of `codex.mcp.json` in your Codex MCP configuration
+3. Restart or reload Codex MCP tools
+4. Run `overleaf_auth_login` from Codex to establish the session
+
+Useful first checks after setup:
+
+- `Run overleaf_auth_status`
+- `Run overleaf_list_tags`
+- `Create an Overleaf tag named "mcp-test-tag"`
+- `Create a new Overleaf project named "MCP Connection Test" with tags [{"name":"mcp-test-tag"}]`
+
+If you prefer, you can replace the absolute `args[0]` path with your own local checkout path.
 
 ## Development
 

@@ -51,6 +51,50 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    toolSchemas.listTags.name,
+    toolSchemas.listTags.description,
+    toolSchemas.listTags.inputSchema.shape,
+    async () => formatResult(await client.listTags())
+  );
+
+  server.tool(
+    toolSchemas.createTag.name,
+    toolSchemas.createTag.description,
+    toolSchemas.createTag.inputSchema.shape,
+    async (input) => formatResult(await client.createTag(toolSchemas.createTag.inputSchema.parse(input)))
+  );
+
+  server.tool(
+    toolSchemas.editTag.name,
+    toolSchemas.editTag.description,
+    toolSchemas.editTag.inputSchema.shape,
+    async (input) => formatResult(await client.editTag(toolSchemas.editTag.inputSchema.parse(input)))
+  );
+
+  server.tool(
+    toolSchemas.deleteTag.name,
+    toolSchemas.deleteTag.description,
+    toolSchemas.deleteTag.inputSchema.shape,
+    async (input) => formatResult(await client.deleteTag(toolSchemas.deleteTag.inputSchema.parse(input)))
+  );
+
+  server.tool(
+    toolSchemas.assignProjectTags.name,
+    toolSchemas.assignProjectTags.description,
+    toolSchemas.assignProjectTags.inputSchema.shape,
+    async (input) =>
+      formatResult(await client.assignProjectTags(toolSchemas.assignProjectTags.inputSchema.parse(input)))
+  );
+
+  server.tool(
+    toolSchemas.removeProjectTags.name,
+    toolSchemas.removeProjectTags.description,
+    toolSchemas.removeProjectTags.inputSchema.shape,
+    async (input) =>
+      formatResult(await client.removeProjectTags(toolSchemas.removeProjectTags.inputSchema.parse(input)))
+  );
+
+  server.tool(
     toolSchemas.listFiles.name,
     toolSchemas.listFiles.description,
     toolSchemas.listFiles.inputSchema.shape,

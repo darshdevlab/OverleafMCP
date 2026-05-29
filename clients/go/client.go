@@ -93,6 +93,10 @@ func (c *Client) ListProjects(ctx context.Context) (string, error) {
 	return c.CallToolText(ctx, ToolListProjects, map[string]any{})
 }
 
+func (c *Client) ListTags(ctx context.Context) (string, error) {
+	return c.CallToolText(ctx, ToolListTags, map[string]any{})
+}
+
 func (c *Client) CreateProject(ctx context.Context, name string, templateID string, tags []map[string]any) (string, error) {
 	payload := map[string]any{
 		"name": name,
@@ -102,6 +106,53 @@ func (c *Client) CreateProject(ctx context.Context, name string, templateID stri
 		payload["templateId"] = templateID
 	}
 	return c.CallToolText(ctx, ToolCreateProject, payload)
+}
+
+func (c *Client) CreateTag(ctx context.Context, name string, color string) (string, error) {
+	payload := map[string]any{
+		"name": name,
+	}
+	if color != "" {
+		payload["color"] = color
+	}
+	return c.CallToolText(ctx, ToolCreateTag, payload)
+}
+
+func (c *Client) EditTag(ctx context.Context, tagID string, name string, color string) (string, error) {
+	payload := map[string]any{
+		"tagId": tagID,
+		"name":  name,
+	}
+	if color != "" {
+		payload["color"] = color
+	}
+	return c.CallToolText(ctx, ToolEditTag, payload)
+}
+
+func (c *Client) DeleteTag(ctx context.Context, tagID string) (string, error) {
+	return c.CallToolText(ctx, ToolDeleteTag, map[string]any{
+		"tagId": tagID,
+	})
+}
+
+func (c *Client) AssignProjectTags(ctx context.Context, projectID string, tags []map[string]any) (string, error) {
+	return c.CallToolText(ctx, ToolAssignProjectTags, map[string]any{
+		"projectId": projectID,
+		"tags":      tags,
+	})
+}
+
+func (c *Client) RemoveProjectTags(ctx context.Context, projectID string, tagIDs []string, tagNames []string) (string, error) {
+	payload := map[string]any{
+		"projectId": projectID,
+	}
+	if len(tagIDs) > 0 {
+		payload["tagIds"] = tagIDs
+	}
+	if len(tagNames) > 0 {
+		payload["tagNames"] = tagNames
+	}
+	return c.CallToolText(ctx, ToolRemoveProjectTags, payload)
 }
 
 func (c *Client) CreateFile(ctx context.Context, projectID string, path string, content string) (string, error) {

@@ -31,6 +31,58 @@
       "arguments": {}
     },
     {
+      "name": "overleaf_list_tags",
+      "description": "List Overleaf organization tags visible to the authenticated user.",
+      "auth": "session",
+      "arguments": {}
+    },
+    {
+      "name": "overleaf_create_tag",
+      "description": "Create an Overleaf organization tag.",
+      "auth": "session",
+      "arguments": {
+        "name": "string",
+        "color": "string?"
+      }
+    },
+    {
+      "name": "overleaf_edit_tag",
+      "description": "Rename or recolor an existing Overleaf organization tag.",
+      "auth": "session",
+      "arguments": {
+        "tagId": "string",
+        "name": "string",
+        "color": "string?"
+      }
+    },
+    {
+      "name": "overleaf_delete_tag",
+      "description": "Delete an Overleaf organization tag.",
+      "auth": "session",
+      "arguments": {
+        "tagId": "string"
+      }
+    },
+    {
+      "name": "overleaf_assign_project_tags",
+      "description": "Assign one or more tags to an Overleaf project. Tags can be referenced by id or created by name.",
+      "auth": "session",
+      "arguments": {
+        "projectId": "string",
+        "tags": "array<{id?: string, name?: string, color?: string}>"
+      }
+    },
+    {
+      "name": "overleaf_remove_project_tags",
+      "description": "Remove one or more tags from an Overleaf project by tag id or tag name.",
+      "auth": "session",
+      "arguments": {
+        "projectId": "string",
+        "tagIds": "string[]?",
+        "tagNames": "string[]?"
+      }
+    },
+    {
       "name": "overleaf_create_project",
       "description": "Create an Overleaf project, optionally from a template, and optionally attach tags.",
       "auth": "session",
