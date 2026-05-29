@@ -50,8 +50,16 @@ This repository currently provides:
 - a reusable TypeScript SDK surface
 - Python and Go thin clients that talk to the MCP server over stdio
 - a shared contract file for the tool surface
+- live project listing via session auth
+- live blank/template project creation via session auth
+- live Git-backed file create, read, update, delete, upload, and sync operations
+- live compile and PDF download via session auth
+- live archive-to-project import through blank project creation plus Git sync
 
-It does not yet provide live Overleaf transport implementations. The tool handlers are still placeholders behind the SDK interfaces.
+Still pending:
+
+- project tag creation and assignment
+- broader browser-driven project management flows beyond the current HTTP and Git transport coverage
 
 ## Security Model
 

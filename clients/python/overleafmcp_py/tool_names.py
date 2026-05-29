@@ -1,5 +1,7 @@
 class OverleafToolName:
     LIST_PROJECTS = "overleaf_list_projects"
+    LIST_FILES = "overleaf_list_files"
+    READ_FILE = "overleaf_read_file"
     CREATE_PROJECT = "overleaf_create_project"
     CREATE_FILE = "overleaf_create_file"
     UPDATE_FILE = "overleaf_update_file"

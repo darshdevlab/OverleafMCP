@@ -82,6 +82,18 @@ class OverleafMCPClient:
     async def list_projects(self) -> Any:
         return await self.call_tool(OverleafToolName.LIST_PROJECTS)
 
+    async def list_files(self, project_id: str, extension: str | None = None) -> Any:
+        return await self.call_tool(
+            OverleafToolName.LIST_FILES,
+            {"projectId": project_id, "extension": extension},
+        )
+
+    async def read_file(self, project_id: str, path: str) -> Any:
+        return await self.call_tool(
+            OverleafToolName.READ_FILE,
+            {"projectId": project_id, "path": path},
+        )
+
     async def create_project(self, name: str, template_id: str | None = None, tags: list[dict[str, Any]] | None = None) -> Any:
         return await self.call_tool(
             OverleafToolName.CREATE_PROJECT,
@@ -116,10 +128,10 @@ class OverleafMCPClient:
             {"projectId": project_id, "paths": paths},
         )
 
-    async def upload_project_archive(self, archive_path: str) -> Any:
+    async def upload_project_archive(self, archive_path: str, project_name: str | None = None) -> Any:
         return await self.call_tool(
             OverleafToolName.UPLOAD_PROJECT_ARCHIVE,
-            {"archivePath": archive_path},
+            {"archivePath": archive_path, "projectName": project_name},
         )
 
     async def compile_project(self, project_id: str) -> Any:

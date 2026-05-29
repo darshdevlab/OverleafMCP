@@ -30,6 +30,20 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    toolSchemas.listFiles.name,
+    toolSchemas.listFiles.description,
+    toolSchemas.listFiles.inputSchema.shape,
+    async (input) => formatResult(await client.listFiles(toolSchemas.listFiles.inputSchema.parse(input)))
+  );
+
+  server.tool(
+    toolSchemas.readFile.name,
+    toolSchemas.readFile.description,
+    toolSchemas.readFile.inputSchema.shape,
+    async (input) => formatResult(await client.readFile(toolSchemas.readFile.inputSchema.parse(input)))
+  );
+
+  server.tool(
     toolSchemas.createProject.name,
     toolSchemas.createProject.description,
     toolSchemas.createProject.inputSchema.shape,

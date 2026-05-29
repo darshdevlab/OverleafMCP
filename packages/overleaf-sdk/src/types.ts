@@ -8,6 +8,10 @@ export interface OverleafCredentials {
 
 export interface OverleafConfig {
   baseUrl: string;
+  gitHost: string;
+  workspaceRoot: string;
+  gitAuthorName: string;
+  gitAuthorEmail: string;
   authMode: OverleafAuthMode;
   credentials: OverleafCredentials;
 }
@@ -21,6 +25,16 @@ export interface CreateProjectInput {
   name: string;
   templateId?: string;
   tags?: ProjectTagInput[];
+}
+
+export interface ListFilesInput {
+  projectId: string;
+  extension?: string;
+}
+
+export interface ReadFileInput {
+  projectId: string;
+  path: string;
 }
 
 export interface CreateFileInput {
@@ -43,6 +57,7 @@ export interface UploadFilesInput {
 
 export interface UploadProjectArchiveInput {
   archivePath: string;
+  projectName?: string;
 }
 
 export interface CompileProjectInput {

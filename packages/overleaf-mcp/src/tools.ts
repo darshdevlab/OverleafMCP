@@ -6,6 +6,22 @@ export const toolSchemas = {
     description: "List Overleaf projects visible to the authenticated user.",
     inputSchema: z.object({})
   },
+  listFiles: {
+    name: "overleaf_list_files",
+    description: "List files in an Overleaf project via the Git-backed workflow.",
+    inputSchema: z.object({
+      projectId: z.string().min(1),
+      extension: z.string().min(1).optional()
+    })
+  },
+  readFile: {
+    name: "overleaf_read_file",
+    description: "Read a file from an Overleaf project via the Git-backed workflow.",
+    inputSchema: z.object({
+      projectId: z.string().min(1),
+      path: z.string().min(1)
+    })
+  },
   createProject: {
     name: "overleaf_create_project",
     description: "Create an Overleaf project, optionally from a template, and optionally attach tags.",
@@ -60,7 +76,8 @@ export const toolSchemas = {
     name: "overleaf_upload_project_archive",
     description: "Create a new Overleaf project by uploading an archive such as a zip file.",
     inputSchema: z.object({
-      archivePath: z.string().min(1)
+      archivePath: z.string().min(1),
+      projectName: z.string().min(1).optional()
     })
   },
   compileProject: {

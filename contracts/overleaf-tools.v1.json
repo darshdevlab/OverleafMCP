@@ -23,6 +23,24 @@
       }
     },
     {
+      "name": "overleaf_list_files",
+      "description": "List files in an Overleaf project via the Git-backed workflow.",
+      "auth": "git",
+      "arguments": {
+        "projectId": "string",
+        "extension": "string?"
+      }
+    },
+    {
+      "name": "overleaf_read_file",
+      "description": "Read a file from an Overleaf project via the Git-backed workflow.",
+      "auth": "git",
+      "arguments": {
+        "projectId": "string",
+        "path": "string"
+      }
+    },
+    {
       "name": "overleaf_create_file",
       "description": "Create a file in an Overleaf project using the Git-backed workflow.",
       "auth": "git",
@@ -65,7 +83,8 @@
       "description": "Create a new Overleaf project by uploading an archive such as a zip file.",
       "auth": "session",
       "arguments": {
-        "archivePath": "string"
+        "archivePath": "string",
+        "projectName": "string?"
       }
     },
     {
