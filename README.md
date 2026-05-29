@@ -65,9 +65,9 @@ This project should not become a credential exfiltration vector. The baseline ru
 - browser automation should reuse an explicit user-approved session, not scrape login credentials
 - logs must redact cookies, bearer tokens, Git credentials, and file upload URLs
 
-## V1 Scope
+## Full Product Scope
 
-The public API is designed to support these tool families:
+The public API is intended to support these tool families:
 
 - project discovery and metadata
 - project creation from blank or template
@@ -77,7 +77,17 @@ The public API is designed to support these tool families:
 - compile and PDF retrieval
 - sync operations via Overleaf Git integration
 
-The first implementation pass in this repo focuses on the public package shape, contracts, and auth model. Tool handlers are wired and intentionally conservative; Overleaf-specific transports still need to be implemented behind the SDK interfaces.
+This is the full target scope for `OverleafMCP`, not a reduced subset.
+
+## Implementation Status
+
+The current repository state is still an implementation foundation:
+
+- the package layout is in place
+- the MCP tool surface is defined
+- the auth model is defined
+- the multi-language client shape is in place
+- the live Overleaf transport layer is still pending
 
 ## Authentication
 
