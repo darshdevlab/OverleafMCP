@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "overleafmcp-py"
+version = "0.1.0"
+description = "Python client for OverleafMCP."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["mcp>=1.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["overleafmcp_py*"]
+
+[tool.setuptools.package-data]
+overleafmcp_py = ["py.typed"]

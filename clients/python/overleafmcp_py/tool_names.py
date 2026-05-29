@@ -1,0 +1,12 @@
+class OverleafToolName:
+    LIST_PROJECTS = "overleaf_list_projects"
+    CREATE_PROJECT = "overleaf_create_project"
+    CREATE_FILE = "overleaf_create_file"
+    UPDATE_FILE = "overleaf_update_file"
+    DELETE_FILE = "overleaf_delete_file"
+    UPLOAD_FILES = "overleaf_upload_files"
+    UPLOAD_PROJECT_ARCHIVE = "overleaf_upload_project_archive"
+    COMPILE_PROJECT = "overleaf_compile_project"
+    DOWNLOAD_PDF = "overleaf_download_pdf"
+    SYNC_PULL = "overleaf_sync_pull"
+    SYNC_PUSH = "overleaf_sync_push"

@@ -1,0 +1,21 @@
+{
+  "name": "overleafmcp-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Public Overleaf MCP monorepo with a reusable SDK and CLI.",
+  "packageManager": "npm@11.12.1",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @overleafmcp/sdk && npm run build --workspace @overleafmcp/server",
+    "clean": "rm -rf packages/*/dist",
+    "dev": "npm run dev --workspace @overleafmcp/server",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.31",
+    "typescript": "^5.8.3"
+  }
+}
